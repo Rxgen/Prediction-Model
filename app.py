@@ -1,11 +1,15 @@
+# app.py
 import streamlit as st
 import pandas as pd
-import requests
+import joblib
 
-# Load the cleaned dataset
+# Load dataset
 df = pd.read_csv("ml_ready.csv")
 
-# Required columns
+# Load model
+model = joblib.load("trend_prediction_model.pkl")
+
+# Required features
 required = ['product_title', 'bsr_movement', 'price_change', 'review_growth',
             'rating_change', 'listing_age_days', 'new_product_flag']
 
@@ -15,14 +19,11 @@ if missing_cols:
     st.error(f"Missing columns in CSV: {missing_cols}")
     st.stop()
 
-# App UI setup
+# UI
 st.set_page_config(page_title="Trend Prediction", layout="centered")
-st.title("🛍️ Product Trend Prediction Dashboard")
+st.title("🛍️ Product Trend Prediction")
 
-# Dropdown to select a product
 selected_title = st.selectbox("Choose a product:", df['product_title'])
-
-# Autofill feature values from selected product
 product = df[df['product_title'] == selected_title].iloc[0]
 
 with st.form("predict_form"):
@@ -36,22 +37,17 @@ with st.form("predict_form"):
     submitted = st.form_submit_button("Predict Trend")
 
 if submitted:
-    payload = {
-        "bsr_movement": bsr_movement,
-        "price_change": price_change,
-        "review_growth": review_growth,
-        "rating_change": rating_change,
-        "listing_age_days": listing_age_days,
-        "new_product_flag": new_product_flag
-    }
+    input_data = pd.DataFrame([{
+        'bsr_movement': bsr_movement,
+        'price_change': price_change,
+        'review_growth': review_growth,
+        'rating_change': rating_change,
+        'listing_age_days': listing_age_days,
+        'new_product_flag': new_product_flag
+    }])
 
     try:
-        response = requests.post("http://127.0.0.1:5000/predict", json=payload)
-        result = response.json()
-
-        if "trend_probability" in result:
-            st.success(f"📈 Trend Probability: {result['trend_probability']}%")
-        else:
-            st.error("❌ Prediction failed. Please check the API or input values.")
+        probability = model.predict_proba(input_data)[0][1]
+        st.success(f"📈 Trend Probability: {round(probability * 100, 2)}%")
     except Exception as e:
-        st.error(f"❌ Error: {e}")
+        st.error(f"❌ Prediction error: {e}")
